@@ -17,12 +17,13 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeMount, onMounted, reactive, ref } from 'vue';
+import { onMounted, reactive, ref } from 'vue';
 import { Socket } from '@/plugins/utils/socket';
 
 const msg = reactive({
   currentToolsIndex: 0,
-  isDown: true,
+  isDown: false,
+  isEnd: true,
   x: 0,
   y: 0
 })
@@ -37,46 +38,52 @@ onMounted(() => {
   let wsExample = ws.getWebSocket() as WebSocket;
   wsExample.onmessage = (event) => {
     const data = JSON.parse(event.data)
-
-    const brush = (ctx.value as CanvasRenderingContext2D)
-    if (data.isDown) {
-      if (data.currentToolsIndex === 0) {
-        brush.beginPath()
-        brush.moveTo(data.x, data.y)
-      }
-      if (data.currentToolsIndex === 1) {
-        brush.clearRect(data.x, data.y, 10, 10)
-        brush.clearRect(data.x, data.y, 10, -10)
-        brush.clearRect(data.x, data.y, -10, -10)
-        brush.clearRect(data.x, data.y, -10, 10)
-      }
-    } else {
-      if (data.currentToolsIndex === 0) {
-        brush.lineTo(data.x, data.y)
-        // 填充颜色
-        brush.strokeStyle = 'black'
-        brush.stroke()
-      }
-      if (data.currentToolsIndex === 1) {
-        brush.clearRect(data.x, data.y, 10, 10)
-        brush.clearRect(data.x, data.y, 10, -10)
-        brush.clearRect(data.x, data.y, -10, -10)
-        brush.clearRect(data.x, data.y, -10, 10)
+    console.log(data);
+    
+    if (!data.isEnd) {
+      const brush = (ctx.value as CanvasRenderingContext2D)
+      if (!data.isDown) {
+        if (data.currentToolsIndex === 0) {
+          brush.beginPath()
+          brush.moveTo(data.x, data.y)
+        }
+        if (data.currentToolsIndex === 1) {
+          brush.clearRect(data.x, data.y, 10, 10)
+          brush.clearRect(data.x, data.y, 10, -10)
+          brush.clearRect(data.x, data.y, -10, -10)
+          brush.clearRect(data.x, data.y, -10, 10)
+        }
+      } else {
+        if (data.currentToolsIndex === 0) {
+          brush.lineTo(data.x, data.y)
+          // 填充颜色
+          brush.strokeStyle = 'black'
+          brush.stroke()
+        }
+        if (data.currentToolsIndex === 1) {
+          brush.clearRect(data.x, data.y, 10, 10)
+          brush.clearRect(data.x, data.y, 10, -10)
+          brush.clearRect(data.x, data.y, -10, -10)
+          brush.clearRect(data.x, data.y, -10, 10)
+        }
       }
     }
   }
 
   if (!IsPC()) {
-    canvas = ref<HTMLCanvasElement | null>(null)
-    ctx = ref<CanvasRenderingContext2D | null>(null)
+    canvas.value!.setAttribute('width', '800')
+    canvas.value!.setAttribute('height', '500')
     canvas.value!.onmousedown = drawingDown
     canvas.value!.onmousemove = drawingMove
     canvas.value!.onmouseup = drawingUp
   } else {
+    canvas.value!.setAttribute('width', '300')
+    canvas.value!.setAttribute('height', '400')
     canvas.value!.ontouchstart = drawingTouchstart
     canvas.value!.ontouchmove = drawingTouchmove
     canvas.value!.ontouchend = drawingTouchend
   }
+
 })
 
 const clickTools = (index: number) => {
@@ -84,9 +91,8 @@ const clickTools = (index: number) => {
 }
 
 const drawingDown = (e: MouseEvent) => {
-  console.log('down', e);
-
   msg.isDown = true
+  msg.isEnd = false
   msg.x = e.offsetX
   msg.y = e.offsetY
 
@@ -107,42 +113,50 @@ const drawingDown = (e: MouseEvent) => {
 }
 
 const drawingMove = (e: MouseEvent) => {
-  msg.isDown = false
-  msg.x = e.offsetX
-  msg.y = e.offsetY
+  if (msg.isDown) {
+    msg.x = e.offsetX
+    msg.y = e.offsetY
 
-  // 发送消息
-  ws.send(msg)
+    // 发送消息
+    ws.send(msg)
 
-  const brush = (ctx.value as CanvasRenderingContext2D)
-  if (msg.currentToolsIndex === 0) {
-    brush.lineTo(msg.x, msg.y)
-    // 填充颜色
-    brush.strokeStyle = 'black'
-    brush.stroke()
-  }
-  if (msg.currentToolsIndex === 1) {
-    brush.clearRect(msg.x, msg.y, 10, 10)
-    brush.clearRect(msg.x, msg.y, 10, -10)
-    brush.clearRect(msg.x, msg.y, -10, -10)
-    brush.clearRect(msg.x, msg.y, -10, 10)
+    const brush = (ctx.value as CanvasRenderingContext2D)
+    if (msg.currentToolsIndex === 0) {
+      brush.lineTo(msg.x, msg.y)
+      // 填充颜色
+      brush.strokeStyle = 'black'
+      brush.stroke()
+    }
+    if (msg.currentToolsIndex === 1) {
+      brush.clearRect(msg.x, msg.y, 10, 10)
+      brush.clearRect(msg.x, msg.y, 10, -10)
+      brush.clearRect(msg.x, msg.y, -10, -10)
+      brush.clearRect(msg.x, msg.y, -10, 10)
+    }
   }
 }
 
 const drawingUp = () => {
-  canvas.value!.onmousemove = null
+  msg.isDown = false
+  msg.isEnd = true
+  // 发送消息
+  ws.send(msg)
 }
 addEventListener('mouseup', () => {
-  canvas.value!.onmousemove = null
-
+  msg.isDown = false
+  msg.isEnd = true
+  // 发送消息
+  ws.send(msg)
 })
 
 
 
 // 手机适配
 const drawingTouchstart = (e: TouchEvent) => {
-  const pageX = e.targetTouches[0].pageX
-  const pageY = e.targetTouches[0].pageY
+  console.log(e);
+
+  const pageX = e.targetTouches[0].pageX - 45
+  const pageY = e.targetTouches[0].pageY - 225
 
   msg.isDown = true
   msg.x = pageX
@@ -165,35 +179,34 @@ const drawingTouchstart = (e: TouchEvent) => {
 }
 
 const drawingTouchmove = (e: TouchEvent) => {
-  console.log(e);
+  if (msg.isDown) {
+    const pageX = e.targetTouches[0].pageX - 45
+    const pageY = e.targetTouches[0].pageY - 225
 
-  const pageX = e.targetTouches[0].pageX
-  const pageY = e.targetTouches[0].pageY
+    msg.x = pageX
+    msg.y = pageY
 
-  msg.isDown = false
-  msg.x = pageX
-  msg.y = pageY
+    // 发送消息
+    ws.send(msg)
 
-  // 发送消息
-  ws.send(msg)
-
-  const brush = (ctx.value as CanvasRenderingContext2D)
-  if (msg.currentToolsIndex === 0) {
-    brush.lineTo(msg.x, msg.y)
-    // 填充颜色
-    brush.strokeStyle = 'black'
-    brush.stroke()
-  }
-  if (msg.currentToolsIndex === 1) {
-    brush.clearRect(msg.x, msg.y, 10, 10)
-    brush.clearRect(msg.x, msg.y, 10, -10)
-    brush.clearRect(msg.x, msg.y, -10, -10)
-    brush.clearRect(msg.x, msg.y, -10, 10)
+    const brush = (ctx.value as CanvasRenderingContext2D)
+    if (msg.currentToolsIndex === 0) {
+      brush.lineTo(msg.x, msg.y)
+      // 填充颜色
+      brush.strokeStyle = 'black'
+      brush.stroke()
+    }
+    if (msg.currentToolsIndex === 1) {
+      brush.clearRect(msg.x, msg.y, 10, 10)
+      brush.clearRect(msg.x, msg.y, 10, -10)
+      brush.clearRect(msg.x, msg.y, -10, -10)
+      brush.clearRect(msg.x, msg.y, -10, 10)
+    }
   }
 }
 
 const drawingTouchend = () => {
-  canvas.value!.ontouchmove = null
+  msg.isDown = false
 }
 
 
@@ -223,8 +236,8 @@ function IsPC() {
   }
 
   .canvas {
-    width: 800px;
-    height: 500px;
+    // width: 800px;
+    // height: 500px;
     background-color: #fff;
   }
 
@@ -265,12 +278,18 @@ function IsPC() {
 
 @media screen and (max-width: 375px) {
   .board {
+    max-width: 375px !important;
     width: 100vw;
-    height: 100vh;
+    height: 100vh !important;
+    overflow: hidden;
 
     .canvas {
-      width: 90vw;
-      height: 60%;
+      // width: 90vw;
+      // height: 60%;
+    }
+
+    .tools {
+      width: 200px;
     }
   }
 }
